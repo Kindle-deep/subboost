@@ -40,8 +40,17 @@ type SourceActions = Pick<
 >;
 
 function pickUrlFetchParseResult(fetched: Awaited<ReturnType<typeof fetchUrlContentInBrowser>>): ParseResult | null {
-  if (!fetched.parseResult) return null;
-  return fetched.parseResult;
+  return fetched.parseResult ?? null;
+}
+
+function toSubscriptionImportErrorInfo(error: unknown, fallbackMessage = "解析失败"): SubscriptionImportErrorInfo {
+  if (isSubscriptionImportError(error)) return error.info;
+  const message = error instanceof Error ? error.message : fallbackMessage;
+  return createSubscriptionImportErrorInfo({
+    category: inferSubscriptionImportErrorCategory(message),
+    message,
+    detail: message,
+  });
 }
 
 export function createSourceActions(set: SetState, get: GetState, setAndGenerateConfig: SetAndGenerateConfig): SourceActions {
@@ -248,9 +257,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
         const resolvedSubscriptionUserInfo = resolveSubscriptionUserInfo(subscriptionUserInfo, result.nodes);
 
         if (result.nodes.length === 0) {
-          const errorMsg = result.errors.length > 0
-            ? result.errors[0]
-            : "未解析到有效节点";
+          const errorMsg = result.errors[0] ?? "未解析到有效节点";
           throw new Error(errorMsg);
         }
 
@@ -334,15 +341,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           };
         });
       } catch (error) {
-        const baseInfo = (() => {
-          if (isSubscriptionImportError(error)) return error.info;
-          const message = error instanceof Error ? error.message : "解析失败";
-          return createSubscriptionImportErrorInfo({
-            category: inferSubscriptionImportErrorCategory(message),
-            message,
-            detail: message,
-          });
-        })();
+        const baseInfo = toSubscriptionImportErrorInfo(error);
         const shouldHintProxyProviders =
           source.type === "url" &&
           !source.useProxyProviders &&
@@ -455,15 +454,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
                 }
               }
             } catch (fetchError) {
-              const baseInfo = (() => {
-                if (isSubscriptionImportError(fetchError)) return fetchError.info;
-                const message = fetchError instanceof Error ? fetchError.message : "未知错误";
-                return createSubscriptionImportErrorInfo({
-                  category: inferSubscriptionImportErrorCategory(message),
-                  message,
-                  detail: message,
-                });
-              })();
+              const baseInfo = toSubscriptionImportErrorInfo(fetchError, "未知错误");
               const shouldHintProxyProviders =
                 !source.useProxyProviders &&
                 !/无效的 url/i.test(baseInfo.message) &&
@@ -517,15 +508,7 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
             lastParsedNameTemplate: currentNameTemplate || undefined,
           });
         } catch (error) {
-          const baseInfo = (() => {
-            if (isSubscriptionImportError(error)) return error.info;
-            const message = error instanceof Error ? error.message : "未知错误";
-            return createSubscriptionImportErrorInfo({
-              category: inferSubscriptionImportErrorCategory(message),
-              message,
-              detail: message,
-            });
-          })();
+          const baseInfo = toSubscriptionImportErrorInfo(error, "未知错误");
           const shouldHintProxyProviders =
             source.type === "url" &&
             !source.useProxyProviders &&
@@ -561,18 +544,18 @@ export function createSourceActions(set: SetState, get: GetState, setAndGenerate
           continue;
         }
 
-        const mergedSourceIds = getNodeSourceIds(existing);
+        const mergedSourceIds = new Set(getNodeSourceIds(existing));
         let changed = false;
         for (const id of getNodeSourceIds(node)) {
-          if (mergedSourceIds.includes(id)) continue;
-          mergedSourceIds.push(id);
+          if (mergedSourceIds.has(id)) continue;
+          mergedSourceIds.add(id);
           changed = true;
         }
         if (!changed) continue;
 
         uniqueNodeMap.set(
           key,
-          ({ ...(existing as unknown as Record<string, unknown>), [SOURCE_IDS_KEY]: mergedSourceIds } as unknown as ParsedNode)
+          ({ ...(existing as unknown as Record<string, unknown>), [SOURCE_IDS_KEY]: Array.from(mergedSourceIds) } as unknown as ParsedNode)
         );
       }
       const uniqueNodes = Array.from(uniqueNodeMap.values());

@@ -147,4 +147,72 @@ ENV
     expect(result.stdout).toContain("健康检查: 正常");
     expect(result.stdout).toContain("Doctor: OK");
   });
+
+  it("updates exact env keys without removing similarly prefixed names", () => {
+    const script = `
+      set -Eeuo pipefail
+      home="$(mktemp -d)"
+      trap 'rm -rf "$home"' EXIT
+      export SUBBOOST_SCRIPT_SOURCE_ONLY=1
+      export SUBBOOST_HOME="$home"
+      source local/scripts/subboost.sh
+      install_secret_file() {
+        cp "$1" "$2"
+      }
+      read_env_file() {
+        cat "$ENV_FILE"
+      }
+      cat > "$ENV_FILE" <<'ENV'
+SUBBOOST_PORT_EXTRA=keep
+SUBBOOST_PORT=3000
+APP_URL=http://old.example
+ENV
+      write_env_value SUBBOOST_PORT 31000
+      cat "$ENV_FILE"
+    `;
+
+    const result = runBash(script);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("SUBBOOST_PORT_EXTRA=keep");
+    expect(result.stdout).toContain("SUBBOOST_PORT=31000");
+    expect(result.stdout).not.toContain("SUBBOOST_PORT=3000");
+  });
+
+  it("prunes old backups without parsing ls output", () => {
+    const script = `
+      set -Eeuo pipefail
+      base="$(mktemp -d)"
+      home="$base/subboost home"
+      mkdir -p "$home/backups"
+      trap 'rm -rf "$base"' EXIT
+      export SUBBOOST_SCRIPT_SOURCE_ONLY=1
+      export SUBBOOST_HOME="$home"
+      source local/scripts/subboost.sh
+      sudo_do() { "$@"; }
+      load_env() { :; }
+      compose() { printf 'dump'; }
+      cat > "$ENV_FILE" <<'ENV'
+POSTGRES_DB=subboost
+POSTGRES_USER=subboost
+ENV
+      for i in $(seq -w 1 12); do
+        : > "$BACKUP_DIR/subboost-20240101T0000\${i}Z.sql.gz"
+        : > "$BACKUP_DIR/subboost-20240101T0000\${i}Z.env"
+      done
+      backup_cmd >/dev/null
+      sql_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.sql.gz' | wc -l | tr -d '[:space:]')"
+      env_count="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'subboost-*.env' | wc -l | tr -d '[:space:]')"
+      printf 'sql=%s env=%s\\n' "$sql_count" "$env_count"
+      [ "$sql_count" = "10" ]
+      [ "$env_count" = "10" ]
+      [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.sql.gz" ]
+      [ ! -e "$BACKUP_DIR/subboost-20240101T000001Z.env" ]
+    `;
+
+    const result = runBash(script);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("sql=10 env=10");
+  });
 });

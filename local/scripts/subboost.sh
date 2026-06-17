@@ -126,7 +126,7 @@ write_env_value() {
   local value="$2"
   local tmp="$TMP_DIR/env"
   mkdir -p "$TMP_DIR"
-  read_env_file | awk -v key="$key" 'index($0, key "=") != 1 { print }' > "$tmp"
+  read_env_file | awk -F= -v key="$key" '$1 != key { print }' > "$tmp"
   printf '%s=%s\n' "$key" "$value" >> "$tmp"
   install_secret_file "$tmp" "$ENV_FILE"
 }
@@ -304,27 +304,27 @@ backup_cmd() {
   load_env
   sudo_do mkdir -p "$BACKUP_DIR"
   local stamp db_tmp db_out env_out
+  local -a sql_backups env_backups
+  local i
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   db_tmp="$BACKUP_DIR/subboost-$stamp.sql.gz.partial"
   db_out="$BACKUP_DIR/subboost-$stamp.sql.gz"
   env_out="$BACKUP_DIR/subboost-$stamp.env"
   compose exec -T db pg_dump -U "${POSTGRES_USER:-subboost}" -d "${POSTGRES_DB:-subboost}" | gzip -c | sudo_do tee "$db_tmp" >/dev/null
   sudo_do mv "$db_tmp" "$db_out"
-  if is_root; then
-    install -m 600 "$ENV_FILE" "$env_out"
-  else
-    sudo install -m 600 "$ENV_FILE" "$env_out"
-  fi
-  while IFS= read -r old_file; do
-    [ -n "$old_file" ] && sudo_do rm -f "$old_file"
-  done <<EOF
-$(ls -1t "$BACKUP_DIR"/subboost-*.sql.gz 2>/dev/null | sed -n '11,$p')
-EOF
-  while IFS= read -r old_file; do
-    [ -n "$old_file" ] && sudo_do rm -f "$old_file"
-  done <<EOF
-$(ls -1t "$BACKUP_DIR"/subboost-*.env 2>/dev/null | sed -n '11,$p')
-EOF
+  sudo_do install -m 600 "$ENV_FILE" "$env_out"
+
+  shopt -s nullglob
+  sql_backups=("$BACKUP_DIR"/subboost-*.sql.gz)
+  env_backups=("$BACKUP_DIR"/subboost-*.env)
+  shopt -u nullglob
+
+  for ((i = 0; i < ${#sql_backups[@]} - 10; i++)); do
+    sudo_do rm -f -- "${sql_backups[$i]}"
+  done
+  for ((i = 0; i < ${#env_backups[@]} - 10; i++)); do
+    sudo_do rm -f -- "${env_backups[$i]}"
+  done
   say "Backup written:"
   say "  $db_out"
   say "  $env_out"

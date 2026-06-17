@@ -25,19 +25,19 @@ function toTrimmedString(value: unknown): string {
 }
 
 function toSlug(value: string): string {
-  let out = "";
+  const parts: string[] = [];
   let pendingDash = false;
   for (const char of value.toLowerCase()) {
     const isAsciiLetterOrDigit = (char >= "a" && char <= "z") || (char >= "0" && char <= "9");
     if (isAsciiLetterOrDigit) {
-      if (pendingDash && out) out += "-";
-      out += char;
+      if (pendingDash && parts.length > 0) parts.push("-");
+      parts.push(char);
       pendingDash = false;
     } else {
       pendingDash = true;
     }
   }
-  return out || "item";
+  return parts.length > 0 ? parts.join("") : "item";
 }
 
 function buildDeterministicCustomRuleId(rule: Pick<CustomRule, "type" | "value" | "target">, index: number): string {
