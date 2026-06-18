@@ -291,6 +291,7 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
   const enabledSet = new Set(enabledModules);
   const resolvePolicyTarget = createPolicyTargetResolver({ availablePolicyTargets, fallbackPolicyTarget });
   const editableEntries = buildOrderedEditableEntries(customRules, customProxyGroups, undefined, resolvePolicyTarget);
+  const emittedRuleKeys = new Set<string>();
   let insertedEditableEntries = false;
 
   const pushEditableEntries = () => {
@@ -299,11 +300,35 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
     entries.push(...editableEntries);
   };
 
+  const pushModuleRuleEntry = (module: ProxyGroupModule, rule: ProxyGroupRule) => {
+    const entry = buildModuleRuleEntry(module, rule, proxyGroupNameOverrides, cnIpNoResolve, resolvePolicyTarget);
+    if (emittedRuleKeys.has(entry.key)) return;
+    emittedRuleKeys.add(entry.key);
+    entries.push(entry);
+  };
+
+  const pushAppleTvPlusAtCanonicalPosition = () => {
+    if (!enabledSet.has("streaming-west")) return;
+    const streamingWestModule = PROXY_GROUP_MODULES.find((item) => item.id === "streaming-west");
+    if (!streamingWestModule) return;
+
+    const appleTvPlusRule = getEffectiveModuleRules(streamingWestModule, moduleRuleOverrides, moduleRuleExclusions)
+      .find((rule) => rule.id === "apple-tvplus");
+    if (!appleTvPlusRule) return;
+
+    // Keep the existing generated order without turning Apple TV+ into a special system rule.
+    pushModuleRuleEntry(streamingWestModule, appleTvPlusRule);
+  };
+
   const processedModules = new Set<string>();
 
   for (const moduleId of RULE_ORDER) {
     if (!insertedEditableEntries && moduleId === "gemini") {
       pushEditableEntries();
+    }
+
+    if (moduleId === "apple") {
+      pushAppleTvPlusAtCanonicalPosition();
     }
 
     if (!enabledSet.has(moduleId)) continue;
@@ -314,7 +339,7 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
 
     const effectiveRules = getEffectiveModuleRules(ruleModule, moduleRuleOverrides, moduleRuleExclusions);
     for (const rule of effectiveRules) {
-      entries.push(buildModuleRuleEntry(ruleModule, rule, proxyGroupNameOverrides, cnIpNoResolve, resolvePolicyTarget));
+      pushModuleRuleEntry(ruleModule, rule);
     }
   }
 
@@ -325,7 +350,7 @@ function buildCanonicalRuleEntries(options: Omit<RulesGenerateOptions, "ruleOrde
 
     const effectiveRules = getEffectiveModuleRules(ruleModule, moduleRuleOverrides, moduleRuleExclusions);
     for (const rule of effectiveRules) {
-      entries.push(buildModuleRuleEntry(ruleModule, rule, proxyGroupNameOverrides, cnIpNoResolve, resolvePolicyTarget));
+      pushModuleRuleEntry(ruleModule, rule);
     }
   }
 

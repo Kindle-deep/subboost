@@ -118,6 +118,7 @@ describe("rule generator", () => {
         experimentalCnUseCnRuleSet: false,
       },
     };
+    const baseline = generateClashConfig(baseConfig);
     const deleted = generateClashConfig({
       ...baseConfig,
       moduleRuleExclusions: { "streaming-west": ["apple-tvplus"] },
@@ -136,7 +137,14 @@ describe("rule generator", () => {
         ],
       },
     });
+    const baselineRules = baseline.rules as string[];
+    const appleTvPlusIndex = baselineRules.indexOf("RULE-SET,apple-tvplus,📺 欧美流媒体");
+    const appleIndex = baselineRules.indexOf("RULE-SET,apple,🍏 苹果服务");
+    const hboIndex = baselineRules.indexOf("RULE-SET,hbo,📺 欧美流媒体");
 
+    expect(appleTvPlusIndex).toBeGreaterThanOrEqual(0);
+    expect(appleTvPlusIndex).toBeLessThan(appleIndex);
+    expect(appleTvPlusIndex).toBeLessThan(hboIndex);
     expect((deleted.rules as string[]).filter((line) => line.startsWith("RULE-SET,apple-tvplus,"))).toEqual([]);
     expect((deleted["rule-providers"] as Record<string, unknown> | undefined)?.["apple-tvplus"]).toBeUndefined();
     expect((moved.rules as string[]).filter((line) => line.startsWith("RULE-SET,apple-tvplus,"))).toEqual([
