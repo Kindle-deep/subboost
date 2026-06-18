@@ -3,9 +3,11 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 
 const publicRoot = path.resolve(__dirname, "../..");
+const BASH_NON_INTERACTIVE_COMMAND =
+  "if command -v setsid >/dev/null 2>&1; then exec setsid \"$BASH\" -s; fi; exec \"$BASH\" -s";
 
 function runBash(script: string) {
-  return spawnSync("bash", ["-lc", "if command -v setsid >/dev/null 2>&1; then exec setsid \"$BASH\" -s; fi; exec \"$BASH\" -s"], {
+  return spawnSync("bash", ["-lc", BASH_NON_INTERACTIVE_COMMAND], {
     cwd: publicRoot,
     encoding: "utf8",
     input: script,
@@ -194,6 +196,7 @@ ENV
         return 0
       }
       curl_count_file="$home/curl-count"
+      ready_threshold=5
       printf '0\\n' > "$curl_count_file"
       curl() {
         count="$(cat "$curl_count_file")"
@@ -201,7 +204,7 @@ ENV
         printf '%s\\n' "$count" > "$curl_count_file"
         case "$*" in
           *"/api/health/live"*) return 0 ;;
-          *"/api/health/ready"*) [ "$count" -ge 5 ]; return $? ;;
+          *"/api/health/ready"*) [ "$count" -ge "$ready_threshold" ]; return $? ;;
         esac
         return 1
       }
@@ -214,6 +217,7 @@ ENV
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("健康检查: 正常");
     expect(result.stdout).not.toContain("健康检查: 异常");
+    // wait_for_health stops once ready succeeds, then status_cmd performs one final live+ready check.
     expect(result.stdout).toContain("curl_count=7");
   });
 
