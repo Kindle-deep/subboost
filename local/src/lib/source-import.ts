@@ -1,4 +1,3 @@
-import { lookup } from "node:dns/promises";
 import {
   createSubscriptionImportErrorInfo,
   inferSubscriptionImportErrorCategory,
@@ -19,6 +18,7 @@ const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 const USERINFO_TIMEOUT_MS = 8000;
 const USERINFO_MAX_BYTES = 256 * 1024;
 const MAX_REDIRECTS = 3;
+type DnsLookupRecord = { address: string };
 
 function headersToRecord(headers: Headers): Record<string, string> {
   const out: Record<string, string> = {};
@@ -61,6 +61,15 @@ function normalizeHostname(hostname: string): string {
   return hostname.replace(/^\[|\]$/g, "").toLowerCase();
 }
 
+async function lookupHostnameAddresses(hostname: string): Promise<DnsLookupRecord[]> {
+  try {
+    const { lookup } = await import("node:dns/promises");
+    return await lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    return [];
+  }
+}
+
 async function validatePublicFetchTarget(url: string): Promise<SourceImportTransportResult | null> {
   let parsed: URL;
   try {
@@ -86,7 +95,7 @@ async function validatePublicFetchTarget(url: string): Promise<SourceImportTrans
     return toSecurityFailure("禁止访问本机或内网地址");
   }
 
-  const records = await lookup(hostname, { all: true, verbatim: true }).catch(() => []);
+  const records = await lookupHostnameAddresses(hostname);
   if (records.some((record) => isPrivateOrReservedIp(record.address))) {
     return toSecurityFailure("禁止访问本机或内网地址");
   }

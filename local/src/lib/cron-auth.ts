@@ -1,12 +1,13 @@
 import { validateCronSecret } from "@subboost/server-core/cron-auth";
 import { apiError } from "./http";
+import { getRuntimeEnv } from "./runtime-env";
 
 function getCronSecret(): string {
-  return (process.env.CRON_SECRET || "").trim();
+  return getRuntimeEnv("CRON_SECRET") || "";
 }
 
 function isDevelopmentBypassAllowed(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.ALLOW_UNAUTHENTICATED_CRON === "true";
+  return process.env.NODE_ENV !== "production" && getRuntimeEnv("ALLOW_UNAUTHENTICATED_CRON") === "true";
 }
 
 export function requireLocalCronAuth(request: Request): ReturnType<typeof apiError> | null {

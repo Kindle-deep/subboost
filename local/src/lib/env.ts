@@ -1,7 +1,9 @@
+import { getRuntimeEnv } from "./runtime-env";
+
 type RequiredEnvName = "DATABASE_URL" | "ENCRYPTION_KEY" | "JWT_SECRET" | "APP_URL";
 
 export function requireEnv(name: RequiredEnvName): string {
-  const value = process.env[name];
+  const value = getRuntimeEnv(name);
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`${name} is required`);
   }

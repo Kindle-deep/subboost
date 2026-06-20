@@ -6,6 +6,8 @@ coverage
 *.tsbuildinfo
 .env
 .env.*
+.dev.vars
+.dev.vars.*
 **/*.db
 data/
 local/src/generated/

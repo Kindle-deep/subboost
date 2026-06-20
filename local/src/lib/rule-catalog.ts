@@ -1,9 +1,10 @@
 import "server-only";
 
 import { createRuleCatalogService } from "@subboost/server-core/rules";
+import { getRuntimeEnv } from "./runtime-env";
 
 export const localRuleCatalogService = createRuleCatalogService({
-  getGitHubToken: () => process.env.GITHUB_TOKEN,
+  getGitHubToken: () => getRuntimeEnv("GITHUB_TOKEN"),
   logger: console,
 });
 

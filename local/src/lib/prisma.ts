@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma";
+import { getRuntimeDatabaseUrl } from "./runtime-env";
 
 const globalForPrisma = globalThis as unknown as {
   localPrisma?: PrismaClient;
@@ -7,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaAdapter() {
   const connectionString =
-    process.env.DATABASE_URL?.trim() || "postgresql://subboost:subboost@localhost:5432/subboost_local?schema=public";
+    getRuntimeDatabaseUrl() || "postgresql://subboost:subboost@localhost:5432/subboost_local?schema=public";
   return new PrismaPg({ connectionString });
 }
 

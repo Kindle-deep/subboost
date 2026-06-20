@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveAppVersionInfo } from "@subboost/server-core/app-version";
 import { compareStableVersions, parseStableVersion } from "@local/lib/release-version";
+import { getRuntimeEnvRecord } from "@local/lib/runtime-env";
 
 export const revalidate = 3600;
 
@@ -46,7 +47,14 @@ function buildFallbackPayload(currentVersion: string): LatestReleasePayload {
 
 export async function GET() {
   const { releaseVersion: currentVersion } = resolveAppVersionInfo({
-    env: process.env,
+    env: getRuntimeEnvRecord([
+      "APP_VERSION",
+      "APP_VERSION_TOKEN",
+      "APP_BUILD_SHA",
+      "GITHUB_SHA",
+      "VERCEL_GIT_COMMIT_SHA",
+      "APP_RELEASE_VERSION",
+    ]),
     cwd: process.cwd(),
   });
   const currentStable = parseStableVersion(currentVersion);

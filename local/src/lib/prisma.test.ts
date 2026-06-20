@@ -3,15 +3,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   PrismaClient: vi.fn(),
   PrismaPg: vi.fn(),
+  getCloudflareContext: vi.fn(),
 }));
 
-async function loadPrismaModule(env: { DATABASE_URL?: string; NODE_ENV?: string }, existing?: unknown) {
+async function loadPrismaModule(
+  env: { DATABASE_URL?: string; NODE_ENV?: string },
+  existing?: unknown,
+  cloudflareEnv?: Record<string, unknown>
+) {
   vi.resetModules();
   vi.doMock("@prisma/adapter-pg", () => ({ PrismaPg: mocks.PrismaPg }));
   vi.doMock("../generated/prisma", () => ({ PrismaClient: mocks.PrismaClient }));
+  vi.doMock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.getCloudflareContext }));
 
   vi.stubEnv("DATABASE_URL", env.DATABASE_URL);
   vi.stubEnv("NODE_ENV", env.NODE_ENV);
+  if (cloudflareEnv) {
+    mocks.getCloudflareContext.mockReturnValue({ env: cloudflareEnv });
+  } else {
+    mocks.getCloudflareContext.mockImplementation(() => {
+      throw new Error("No Cloudflare context");
+    });
+  }
   if (existing === undefined) {
     delete (globalThis as { localPrisma?: unknown }).localPrisma;
   } else {
@@ -41,6 +54,7 @@ describe("local prisma singleton", () => {
     vi.unstubAllEnvs();
     delete (globalThis as { localPrisma?: unknown }).localPrisma;
     vi.doUnmock("@prisma/adapter-pg");
+    vi.doUnmock("@opennextjs/cloudflare");
     vi.doUnmock("../generated/prisma");
   });
 
@@ -83,5 +97,17 @@ describe("local prisma singleton", () => {
     });
     expect((globalThis as { localPrisma?: unknown }).localPrisma).toBeUndefined();
     expect(mod.prisma).toEqual(expect.objectContaining({ clientOptions: expect.any(Object) }));
+  });
+
+  it("prefers a Cloudflare Hyperdrive connection string when available", async () => {
+    await loadPrismaModule(
+      { DATABASE_URL: "postgresql://ignored.example/db", NODE_ENV: "production" },
+      undefined,
+      { HYPERDRIVE: { connectionString: " postgresql://hyperdrive.example/db " } }
+    );
+
+    expect(mocks.PrismaPg).toHaveBeenCalledWith({
+      connectionString: "postgresql://hyperdrive.example/db",
+    });
   });
 });

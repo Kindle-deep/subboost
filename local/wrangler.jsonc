@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "subboost-local",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-04-15",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "observability": {
+    "enabled": true
+  },
+
+  // For production PostgreSQL on Workers, create a Hyperdrive config and
+  // uncomment this binding. The app prefers HYPERDRIVE.connectionString over
+  // DATABASE_URL when the binding is present.
+  //
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "<your-hyperdrive-id>"
+  //   }
+  // ]
+}

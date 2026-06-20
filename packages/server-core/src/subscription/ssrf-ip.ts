@@ -1,5 +1,3 @@
-import { isIP } from "node:net";
-
 function ipv4ToInt(ip: string): number | null {
   const parts = ip.split(".");
   if (parts.length !== 4) return null;
@@ -13,6 +11,19 @@ function ipv4ToInt(ip: string): number | null {
       (nums[3] >>> 0)) >>>
     0
   );
+}
+
+function isIPv4Address(value: string): boolean {
+  return value.split(".").length === 4 && ipv4ToInt(value) !== null;
+}
+
+function normalizeIPv6Address(value: string): string | null {
+  if (!value.includes(":")) return null;
+  try {
+    return new URL(`http://[${value}]/`).hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 function ipv4InCidr(ipInt: number, baseInt: number, maskBits: number): boolean {
@@ -100,8 +111,8 @@ function isPrivateOrReservedIPv6(ip: string): boolean {
 }
 
 export function isPrivateOrReservedIp(hostname: string): boolean {
-  const version = isIP(hostname);
-  if (version === 4) return isPrivateOrReservedIPv4(hostname);
-  if (version === 6) return isPrivateOrReservedIPv6(hostname);
+  if (isIPv4Address(hostname)) return isPrivateOrReservedIPv4(hostname);
+  const ipv6 = normalizeIPv6Address(hostname);
+  if (ipv6) return isPrivateOrReservedIPv6(ipv6);
   return false;
 }

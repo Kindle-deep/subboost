@@ -6,6 +6,7 @@ import { ScrollLockStabilizer } from "@subboost/ui/components/layout/scroll-lock
 import { ConfirmDialogHost } from "@subboost/ui/components/ui/confirm-dialog";
 import { Toaster } from "@subboost/ui/components/ui/toaster";
 import { LocalHeader } from "@local/components/local-header";
+import { getRuntimeEnvRecord } from "@local/lib/runtime-env";
 import { resolveAppVersionInfo } from "@subboost/server-core/app-version";
 import {
   SUBBOOST_FAVICON_PATH,
@@ -39,7 +40,17 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const { buildVersion } = resolveAppVersionInfo({ env: process.env, cwd: process.cwd() });
+  const { buildVersion } = resolveAppVersionInfo({
+    env: getRuntimeEnvRecord([
+      "APP_VERSION",
+      "APP_VERSION_TOKEN",
+      "APP_BUILD_SHA",
+      "GITHUB_SHA",
+      "VERCEL_GIT_COMMIT_SHA",
+      "APP_RELEASE_VERSION",
+    ]),
+    cwd: process.cwd(),
+  });
 
   return (
     <html lang="zh-CN" className="dark">

@@ -1,0 +1,6 @@
+APP_URL=http://127.0.0.1:8787
+DATABASE_URL=postgresql://subboost:subboost@localhost:5432/subboost_local?schema=public
+ENCRYPTION_KEY=<generate-a-random-key>
+JWT_SECRET=<generate-a-random-key>
+CRON_SECRET=<generate-a-random-key>
+GITHUB_TOKEN=

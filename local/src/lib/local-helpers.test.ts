@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
   };
   let ruleCatalogOptions:
     | {
-        getGitHubToken: () => string;
+        getGitHubToken: () => string | undefined;
         logger: typeof console;
       }
     | undefined;
@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => {
     decryptEncryptedFieldV2: vi.fn(),
     createRuleCatalogService: vi.fn(
       (options: {
-        getGitHubToken: () => string;
+        getGitHubToken: () => string | undefined;
         logger: typeof console;
       }) => {
         ruleCatalogOptions = options;
@@ -33,10 +33,12 @@ const mocks = vi.hoisted(() => {
       },
     ),
     getRuleCatalogOptions: () => ruleCatalogOptions,
+    getCloudflareContext: vi.fn(),
     ruleService,
   };
 });
 
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: mocks.getCloudflareContext }));
 vi.mock("server-only", () => ({}));
 vi.mock("./prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("./session", () => ({ readSession: mocks.readSession }));
@@ -52,6 +54,7 @@ import { getCurrentAdmin, isSetupRequired } from "./auth";
 import { decryptJson, decryptJsonObject, decryptText, encryptJson, encryptText } from "./crypto";
 import { getAppUrl, isHttpsAppUrl, requireEnv } from "./env";
 import { apiError, getStringField, json, readJsonBody } from "./http";
+import { getRuntimeDatabaseUrl } from "./runtime-env";
 import {
   getCnRuleCandidateDiscovery,
   localRuleCatalogService,
@@ -83,6 +86,9 @@ describe("local lib helpers", () => {
     process.env.APP_URL = " https://local.subboost.test/// ";
     process.env.ENCRYPTION_KEY = " master-key ";
     process.env.GITHUB_TOKEN = "gh-token";
+    mocks.getCloudflareContext.mockImplementation(() => {
+      throw new Error("No Cloudflare context");
+    });
     mocks.encryptEncryptedFieldV2.mockImplementation((plaintext: string, key: string) => `enc:${key}:${plaintext}`);
     mocks.decryptEncryptedFieldV2.mockImplementation((ciphertext: string, key: string) => {
       if (ciphertext === "json") return JSON.stringify({ ok: true });
@@ -106,6 +112,23 @@ describe("local lib helpers", () => {
 
     delete process.env.APP_URL;
     expect(() => requireEnv("APP_URL")).toThrow("APP_URL is required");
+  });
+
+  it("reads required values and Hyperdrive from Cloudflare bindings", () => {
+    delete process.env.APP_URL;
+    delete process.env.ENCRYPTION_KEY;
+    delete process.env.DATABASE_URL;
+    mocks.getCloudflareContext.mockReturnValue({
+      env: {
+        APP_URL: " https://cf.subboost.test/// ",
+        ENCRYPTION_KEY: " cf-master-key ",
+        HYPERDRIVE: { connectionString: " postgresql://hyperdrive.example/db " },
+      },
+    });
+
+    expect(requireEnv("ENCRYPTION_KEY")).toBe("cf-master-key");
+    expect(getAppUrl()).toBe("https://cf.subboost.test");
+    expect(getRuntimeDatabaseUrl()).toBe("postgresql://hyperdrive.example/db");
   });
 
   it("loads current admin and setup state from the local session", async () => {
